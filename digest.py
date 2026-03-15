@@ -35,9 +35,17 @@ FEEDS = {
         ("The Verge", "https://www.theverge.com/rss/index.xml"),
         ("Wired", "https://www.wired.com/feed/rss"),
     ],
-    "creator_economy": [
-        ("Digiday", "https://digiday.com/feed/"),
-        ("Social Media Today", "https://www.socialmediatoday.com/feeds/all.rss"),
+    "human_insights": [
+        ("HBR", "https://feeds.hbr.org/harvardbusiness"),
+        ("Psychology Today", "https://www.psychologytoday.com/us/front-page/feed"),
+        ("The Cut", "https://www.thecut.com/rss/index.xml"),
+        ("Big Think", "https://bigthink.com/feed/"),
+    ],
+    "ai": [
+        ("MIT Tech Review AI", "https://www.technologyreview.com/feed/"),
+        ("VentureBeat AI", "https://venturebeat.com/category/ai/feed/"),
+        ("Anthropic Blog", "https://www.anthropic.com/blog/rss"),
+        ("The Gradient", "https://thegradient.pub/rss/"),
     ],
 }
 
@@ -71,7 +79,8 @@ def build_prompt(articles):
         "finance": "FINANCE",
         "geopolitics": "GEOPOLITICS",
         "tech": "TECH",
-        "creator_economy": "CREATOR ECONOMY",
+        "human_insights": "HUMAN INSIGHTS",
+        "ai": "AI",
     }
 
     article_dump = ""
@@ -80,34 +89,39 @@ def build_prompt(articles):
         for item in articles.get(category, []):
             article_dump += f"- {item}\n"
 
-    prompt = f"""You are a sharp, witty friend who actually reads the news — think the love child of a Bloomberg terminal and a group chat that's way too online. Your job is to write a daily digest that's informative but fun, punchy but never shallow.
+    prompt = f"""You are a sharp, witty friend who actually reads the news. Your job is to write a daily digest that is clear, easy to understand, and fun to read — like explaining the news to a smart friend over coffee.
 
-Here are today's articles across four categories:
+Here are today's articles across five categories:
 {article_dump}
 
-Write a digest with exactly these five sections. Use the section headers exactly as shown:
+Write a digest with exactly these six sections. Use the section headers exactly as shown:
 
 ## Money Talk
-Recap the most interesting finance/market news. Be sharp, use analogies, make it stick. 3–5 paragraphs.
+Cover the most interesting finance and market news. Start each story with a bold one-line headline that tells me what it's about (e.g. **Fed holds rates steady**), then explain it in plain English in 2–3 sentences. Cover 3–5 stories.
 
 ## World Lore
-Cover geopolitics — what's happening, why it matters, what most people are missing. 3–5 paragraphs.
+Cover the key geopolitics stories. Start each story with a bold one-line headline, then explain what happened, why it matters, and what most people are missing. Cover 3–5 stories.
 
 ## Tech Tea
-Spill on the tech world. What's hype, what's real, what's quietly important. 3–5 paragraphs.
+Cover what's happening in tech. Start each story with a bold one-line headline, then break it down simply — what it is, why it matters. Cover 3–5 stories.
 
-## Creator Szn
-Break down what's moving in the creator economy, social media, and digital media. 2–3 paragraphs.
+## Human Insights
+Cover the most interesting ideas from psychology, behavior, and human potential. Start each story with a bold one-line headline, then explain the key insight in plain, jargon-free language. Cover 2–3 stories.
+
+## AI
+Cover the most important AI news and research. Start each story with a bold one-line headline, then explain what's happening and why it matters in simple terms — assume the reader is smart but not a technical expert. Cover 3–5 stories.
 
 ## Speed Round
-10 quick one-liner takeaways — one sentence each, punchy and memorable, covering anything from above that didn't make the sections. Format as a numbered list.
+10 quick one-liner takeaways — one sentence each, covering anything from above that didn't make the main sections. Format as a numbered list.
 
 Rules:
-- Write like you're texting a smart friend, not filing a report
-- No corporate speak, no filler, no "it remains to be seen"
-- If something is actually wild, say so
-- If something is boring but important, make it interesting
-- Keep total length under 1200 words
+- Write like you're explaining to a smart friend, not writing a report
+- Jargon and buzzwords are fine if they're genuinely useful — just don't hide behind them
+- Each story must start with a bold headline so the reader instantly knows what it's about
+- Be direct: state the point, then explain it
+- Keep it interesting — if something is dry, find the angle that makes it matter
+- If something is surprising or important, say so clearly
+- Keep total length under 1500 words
 """
     return prompt
 
@@ -155,10 +169,15 @@ def markdown_to_html_sections(text):
             "icon": "⚡",
             "bg": "#0f1a3a",
         },
-        "Creator Szn": {
-            "color": "#e07af5",
-            "icon": "🎨",
-            "bg": "#25103a",
+        "Human Insights": {
+            "color": "#f97316",
+            "icon": "🧠",
+            "bg": "#2e1500",
+        },
+        "AI": {
+            "color": "#38bdf8",
+            "icon": "🤖",
+            "bg": "#0a1f2e",
         },
         "Speed Round": {
             "color": "#ff6b6b",
@@ -168,7 +187,7 @@ def markdown_to_html_sections(text):
     }
 
     # Split by section headers (## Section Name)
-    pattern = r"##\s+(Money Talk|World Lore|Tech Tea|Creator Szn|Speed Round)"
+    pattern = r"##\s+(Money Talk|World Lore|Tech Tea|Human Insights|AI|Speed Round)"
     parts = re.split(pattern, text)
 
     html_sections = ""
