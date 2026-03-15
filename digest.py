@@ -41,7 +41,7 @@ FEEDS = {
     ],
 }
 
-ARTICLES_PER_FEED = 3
+ARTICLES_PER_FEED = 5
 
 
 def fetch_articles():
