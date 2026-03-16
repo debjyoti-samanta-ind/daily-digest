@@ -198,11 +198,8 @@ def markdown_to_html_sections(text):
         section_body = parts[i + 1].strip() if i + 1 < len(parts) else ""
         style = section_styles.get(section_name, {"color": "#ffffff", "icon": "•", "bg": "#1a1a2e"})
 
-        # Convert numbered lists
-        section_body = re.sub(r"^\d+\.\s+(.+)$", r"<li>\1</li>", section_body, flags=re.MULTILINE)
-        if "<li>" in section_body:
-            section_body = re.sub(r"(<li>.*?</li>)", r"<ol>\1</ol>", section_body, flags=re.DOTALL)
-            section_body = re.sub(r"</ol>\s*<ol>", "", section_body)
+        # Strip numbered list prefixes (e.g. "1. ") — render as plain paragraphs
+        section_body = re.sub(r"^\d+\.\s+", "", section_body, flags=re.MULTILINE)
 
         # Convert bullet lists
         section_body = re.sub(r"^[-*]\s+(.+)$", r"<li>\1</li>", section_body, flags=re.MULTILINE)
