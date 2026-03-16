@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Digest — System Design</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #faf7f2; --card: #ffffff; --border: #e5e0d5; --border2: #cfc8b8;
+      --text: #1a1510; --muted: #7a6f60; --accent: #8b6030; --ab: #f0e8d8;
+    }
+    body { background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:var(--text); overflow:hidden; height:100vh; width:100vw; }
+
+    /* ── deck / slides ── */
+    .deck { width:100vw; height:100vh; position:relative; }
+    .slide { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:44px 68px 76px; opacity:0; pointer-events:none; transform:translateX(28px); transition:opacity .4s,transform .4s; }
+    .slide.active { opacity:1; pointer-events:all; transform:none; }
+    .slide.out { opacity:0; transform:translateX(-28px); transition:opacity .3s,transform .3s; }
+
+    /* ── nav ── */
+    .nav { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px; z-index:200; }
+    .nb { width:38px; height:38px; border-radius:50%; border:1.5px solid var(--border2); background:var(--card); color:var(--muted); font-size:.95rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.2s; box-shadow:0 2px 8px rgba(0,0,0,.07); }
+    .nb:hover:not(:disabled) { background:var(--ab); color:var(--accent); border-color:var(--accent); }
+    .nb:disabled { opacity:.3; cursor:default; }
+    .sc { font-size:.72rem; font-weight:700; color:var(--muted); letter-spacing:.1em; min-width:48px; text-align:center; }
+    .dots { position:fixed; right:24px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; z-index:200; }
+    .dot { width:7px; height:7px; border-radius:50%; background:var(--border2); cursor:pointer; transition:.2s; }
+    .dot.active { background:var(--accent); transform:scale(1.5); }
+    .kh { position:fixed; bottom:30px; right:36px; font-size:.6rem; color:#c0b8a8; letter-spacing:.08em; }
+
+    /* ── shared ── */
+    .ey { font-size:.65rem; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
+    .sh { font-size:1.95rem; font-weight:900; letter-spacing:-.03em; line-height:1.1; color:var(--text); margin-bottom:12px; }
+    .w100 { width:100%; }
+    code { background:#ede8e0; padding:1px 6px; border-radius:4px; font-size:.78rem; color:#7a3a10; font-family:Menlo,monospace; }
+    .chip { display:inline-flex; align-items:center; gap:6px; font-size:.7rem; font-weight:700; padding:4px 12px; border-radius:20px; border:1.5px solid; }
+
+    /* ── SLIDE 1 title ── */
+    .s1 .big { font-size:5.2rem; font-weight:900; letter-spacing:-.05em; line-height:.95; text-align:center; margin-bottom:20px; }
+    .s1 .big span { color:var(--accent); }
+    .s1 .desc { font-size:1rem; color:var(--muted); max-width:500px; text-align:center; line-height:1.7; margin-bottom:32px; }
+    .pill-row { display:flex; gap:9px; flex-wrap:wrap; justify-content:center; }
+    .pill { font-size:.72rem; font-weight:700; padding:6px 15px; border-radius:20px; border:1.5px solid; }
+
+    /* ══════════════════════════════
+       SLIDE 2 — MASTER FLOWCHART
+    ══════════════════════════════ */
+    .fc { width:100%; display:flex; flex-direction:column; gap:8px; }
+
+    /* row wrapper */
+    .fc-row { display:flex; align-items:center; gap:0; }
+    .fc-row-label { font-size:.58rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:#b8ae9a; width:82px; flex-shrink:0; }
+
+    /* node */
+    .node {
+      background:var(--card); border:1.5px solid var(--border2); border-radius:10px;
+      padding:9px 13px; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,.05);
+    }
+    .node .ni { font-size:1.1rem; display:block; margin-bottom:2px; }
+    .node .nt { font-size:.75rem; font-weight:800; color:var(--text); display:block; white-space:nowrap; }
+    .node .ns { font-size:.6rem; color:var(--muted); display:block; white-space:nowrap; margin-top:1px; }
+    /* code file badge on a node */
+    .node .nf { display:inline-block; background:#ede8e0; border:1px solid #d0c8b8; border-radius:4px; font-size:.58rem; font-family:Menlo,monospace; color:#7a3a10; padding:1px 6px; margin-top:4px; white-space:nowrap; }
+
+    /* horizontal arrow */
+    .harr { display:flex; flex-direction:column; align-items:center; flex-shrink:0; padding:0 5px; gap:1px; }
+    .harr .hl { height:2px; width:34px; background:var(--border2); }
+    .harr .hh { width:0; height:0; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:6px solid var(--border2); margin-left:-1px; }
+    .harr .hlb { font-size:.52rem; color:#c0b5a0; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+
+    /* vertical arrow */
+    .varr { display:flex; flex-direction:column; align-items:center; gap:1px; margin:0 auto; }
+    .varr .vl { width:2px; height:16px; background:var(--border2); }
+    .varr .vh { width:0; height:0; border-left:4px solid transparent; border-right:4px solid transparent; border-top:6px solid var(--border2); }
+    .varr .vlb { font-size:.52rem; color:#c0b5a0; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; margin-top:2px; }
+
+    /* wide node */
+    .wnode { background:var(--card); border:1.5px solid var(--border2); border-radius:10px; padding:9px 16px; flex:1; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+    .wnode .wrow { display:flex; align-items:center; gap:10px; }
+    .wnode .wicon { font-size:1.1rem; flex-shrink:0; }
+    .wnode .wtitle { font-size:.75rem; font-weight:800; color:var(--text); }
+    .wnode .wsub { font-size:.6rem; color:var(--muted); margin-top:1px; }
+    .wnode .wf { display:inline-block; background:#ede8e0; border:1px solid #d0c8b8; border-radius:4px; font-size:.58rem; font-family:Menlo,monospace; color:#7a3a10; padding:1px 6px; margin-top:4px; white-space:nowrap; }
+    .wnode .wbadge { font-size:.6rem; font-weight:800; letter-spacing:.08em; padding:3px 9px; border-radius:6px; margin-left:auto; flex-shrink:0; }
+
+    /* pipeline wrapper — dashed border labelled "digest.py" */
+    .pipeline-wrap {
+      border:2px dashed #c8bfaa; border-radius:12px;
+      padding:10px 12px; position:relative; flex:1;
+      display:flex; align-items:center; gap:0;
+    }
+    .pipeline-wrap .pw-label {
+      position:absolute; top:-10px; left:14px;
+      background:var(--bg); padding:0 7px;
+      font-size:.6rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase;
+      color:#8b6030; font-family:Menlo,monospace;
+    }
+
+    /* colour highlights */
+    .hl-gold   { border-color:#d0a850 !important; background:#fffbee !important; }
+    .hl-green  { border-color:#80d090 !important; background:#f0fff5 !important; }
+    .hl-purple { border-color:#b898e8 !important; background:#f8f0ff !important; }
+    .hl-blue   { border-color:#88bce8 !important; background:#f0f5ff !important; }
+    .hl-rose   { border-color:#f09ab0 !important; background:#fff0f5 !important; }
+    .hl-teal   { border-color:#78c8b8 !important; background:#f0fdf8 !important; }
+    .hl-amber  { border-color:#e0b050 !important; background:#fff8ee !important; }
+
+    /* legend */
+    .legend { display:flex; gap:12px; padding:8px 14px; background:var(--card); border:1.5px solid var(--border); border-radius:9px; flex-wrap:wrap; }
+    .leg-item { display:flex; align-items:center; gap:5px; }
+    .leg-swatch { width:11px; height:11px; border-radius:3px; border:1.5px solid; flex-shrink:0; }
+    .leg-label { font-size:.64rem; color:var(--muted); }
+
+    /* ══════════════════════════════
+       DEEP DIVE SLIDES
+    ══════════════════════════════ */
+    .two-col { display:flex; gap:24px; width:100%; }
+    .col { flex:1; display:flex; flex-direction:column; gap:10px; }
+    .col-card { background:var(--card); border:1.5px solid var(--border); border-radius:12px; padding:16px 18px; box-shadow:0 2px 10px rgba(0,0,0,.05); }
+    .col-card .ch { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+    .col-card .ci { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0; }
+    .col-card h3 { font-size:.82rem; font-weight:800; color:var(--text); }
+    .col-card .csub { font-size:.62rem; color:var(--accent); font-weight:700; letter-spacing:.08em; text-transform:uppercase; margin-bottom:3px; }
+
+    .tp { display:flex; gap:10px; align-items:flex-start; }
+    .tp .ti { font-size:.95rem; flex-shrink:0; margin-top:1px; }
+    .tp .tx { font-size:.79rem; color:var(--muted); line-height:1.65; }
+    .tp .tx strong { color:var(--text); font-weight:700; }
+    .tps { display:flex; flex-direction:column; gap:8px; }
+
+    .file-tag { display:inline-flex; align-items:center; gap:5px; background:#ede8e0; border:1px solid #d0c8b8; border-radius:5px; font-size:.68rem; font-family:Menlo,monospace; color:#7a3a10; padding:2px 8px; margin-bottom:6px; }
+
+    /* ── CLAUDE GRID ── */
+    .cc-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:11px; width:100%; }
+    .cc { background:var(--card); border:1.5px solid var(--border); border-radius:11px; padding:14px 15px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .cc .cci { font-size:1.2rem; margin-bottom:6px; display:block; }
+    .cc h4 { font-size:.79rem; font-weight:800; color:var(--text); margin-bottom:3px; }
+    .cc p  { font-size:.72rem; color:var(--muted); line-height:1.6; }
+
+    /* ── STATS ── */
+    .stats4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; width:100%; margin-bottom:14px; }
+    .sc2 { background:var(--card); border:1.5px solid var(--border); border-radius:14px; padding:22px 18px; text-align:center; box-shadow:0 2px 12px rgba(0,0,0,.05); }
+    .sc2 .sn { font-size:2.4rem; font-weight:900; letter-spacing:-.04em; line-height:1; margin-bottom:5px; }
+    .sc2 .sl { font-size:.72rem; color:var(--muted); line-height:1.5; }
+    .brow { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; width:100%; }
+    .bc { background:var(--card); border:1.5px solid var(--border); border-radius:11px; padding:14px 18px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .bc .bl { font-size:.6rem; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin-bottom:3px; }
+    .bc .bv { font-size:.88rem; font-weight:800; color:var(--text); margin-bottom:2px; }
+    .bc .bs { font-size:.7rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- ════════════════════════════════════════ -->
+<!-- SLIDE 1 · TITLE                          -->
+<!-- ════════════════════════════════════════ -->
+<div class="slide s1 active" data-i="0">
+  <div class="big">The Daily<br><span>Digest</span></div>
+  <p class="desc">An automated pipeline that turns 15 news sources into a polished briefing in your inbox every morning at 7 AM — zero manual effort.</p>
+  <div class="pill-row">
+    <div class="pill" style="background:#fff8e8;border-color:#e0b860;color:#7a4a10;">⏰ Fully automated</div>
+    <div class="pill" style="background:#f0fff5;border-color:#80d090;color:#1a6030;">🐙 GitHub Actions</div>
+    <div class="pill" style="background:#f8f0ff;border-color:#b898e8;color:#5020a0;">✦ Gemini 2.5 Flash</div>
+    <div class="pill" style="background:#fff0f5;border-color:#f09ab0;color:#a02050;">📬 Gmail SMTP</div>
+    <div class="pill" style="background:#fffbee;border-color:#d0a850;color:#7a4a00;">🤖 Claude Code</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- SLIDE 2 · MASTER SYSTEM DESIGN           -->
+<!-- ════════════════════════════════════════ -->
+<div class="slide" data-i="1">
+  <div class="w100">
+    <div class="ey">End-to-End Architecture</div>
+    <div class="sh" style="margin-bottom:14px;">System Design</div>
+
+    <div class="fc">
+
+      <!-- ROW 1: Developer layer -->
+      <div class="fc-row">
+        <div class="fc-row-label">Developer</div>
+        <!-- Claude Code -->
+        <div class="node hl-gold" style="width:152px;">
+          <span class="ni">🤖</span>
+          <span class="nt">Claude Code</span>
+          <span class="ns">AI coding assistant</span>
+          <span class="ns">writes & maintains</span>
+        </div>
+        <!-- arrow: writes -->
+        <div class="harr"><div class="hlb">writes</div><div style="display:flex;align-items:center;"><div class="hl"></div><div class="hh"></div></div></div>
+        <!-- GitHub Repo -->
+        <div class="node hl-green" style="width:260px;">
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <span class="ni" style="flex-shrink:0;">🐙</span>
+            <div>
+              <span class="nt">GitHub Repository</span>
+              <span class="ns">Stores code, triggers automation, holds secrets</span>
+              <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;">
+                <span class="nf">digest.py</span>
+                <span class="nf">daily-digest.yml</span>
+                <span class="nf">requirements.txt</span>
+                <span class="nf">🔑 Secrets</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1;display:flex;justify-content:flex-end;align-items:center;padding-right:8px;">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px;opacity:.65;">
+            <span style="font-size:.54rem;color:#b8ae9a;letter-spacing:.07em;text-transform:uppercase;">daily-digest.yml<br>cron 7 AM PDT</span>
+            <svg width="12" height="18" viewBox="0 0 12 18"><line x1="6" y1="0" x2="6" y2="11" stroke="#c8b8a0" stroke-width="2"/><polygon points="0,11 12,11 6,18" fill="#c8b8a0"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROW 2: Automation -->
+      <div class="fc-row">
+        <div class="fc-row-label">Automation</div>
+        <div style="width:152px;flex-shrink:0;"></div><!-- spacer -->
+        <div style="width:34px;flex-shrink:0;"></div><!-- arrow width -->
+        <div class="wnode hl-green">
+          <div class="wrow">
+            <span class="wicon">⚙️</span>
+            <div style="flex:1;">
+              <div class="wtitle">GitHub Actions Runner</div>
+              <div class="wsub">Free cloud VM · installs Python · loads secrets from GitHub · executes script</div>
+              <span class="wf">daily-digest.yml</span>
+              <span class="wf" style="margin-left:4px;">requirements.txt</span>
+            </div>
+            <div class="wbadge" style="background:#d8f8e8;color:#1a6030;">⏰ 7 AM PDT daily</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- vertical arrow -->
+      <div class="fc-row" style="padding-left:186px;">
+        <div style="flex:1;display:flex;justify-content:center;">
+          <div class="varr"><div class="vl"></div><div class="vh"></div><div class="vlb">runs</div></div>
+        </div>
+      </div>
+
+      <!-- ROW 3: Pipeline (inside digest.py wrapper) -->
+      <div class="fc-row">
+        <div class="fc-row-label">Pipeline</div>
+        <div class="pipeline-wrap">
+          <span class="pw-label">digest.py — Python orchestrator</span>
+
+          <!-- RSS -->
+          <div class="node hl-amber" style="width:110px;">
+            <span class="ni">📡</span>
+            <span class="nt">RSS Feeds</span>
+            <span class="ns">15 sources</span>
+            <span class="ns">5 categories</span>
+            <span class="nf">feedparser</span>
+          </div>
+          <div class="harr"><div class="hlb">~75 articles</div><div style="display:flex;align-items:center;"><div class="hl"></div><div class="hh"></div></div></div>
+
+          <!-- Gemini -->
+          <div class="node hl-purple" style="width:120px;">
+            <span class="ni">✦</span>
+            <span class="nt">Gemini 2.5 Flash</span>
+            <span class="ns">reads all articles</span>
+            <span class="ns">writes 6-section digest</span>
+            <span class="nf">google-genai</span>
+          </div>
+          <div class="harr"><div class="hlb">digest text</div><div style="display:flex;align-items:center;"><div class="hl"></div><div class="hh"></div></div></div>
+
+          <!-- HTML Builder -->
+          <div class="node hl-blue" style="width:116px;">
+            <span class="ni">🎨</span>
+            <span class="nt">HTML Builder</span>
+            <span class="ns">formats into styled</span>
+            <span class="ns">dark-theme email</span>
+            <span class="nf">build_html_email()</span>
+          </div>
+          <div class="harr"><div class="hlb">HTML email</div><div style="display:flex;align-items:center;"><div class="hl"></div><div class="hh"></div></div></div>
+
+          <!-- Gmail -->
+          <div class="node hl-rose" style="width:112px;">
+            <span class="ni">📬</span>
+            <span class="nt">Gmail SMTP</span>
+            <span class="ns">sends via port 465</span>
+            <span class="ns">SSL encrypted</span>
+            <span class="nf">smtplib</span>
+          </div>
+          <div class="harr"><div style="display:flex;align-items:center;"><div class="hl"></div><div class="hh"></div></div></div>
+
+          <!-- Inbox -->
+          <div class="node hl-teal" style="width:100px;">
+            <span class="ni">✉️</span>
+            <span class="nt">Your Inbox</span>
+            <span class="ns">dsaman@uw.edu</span>
+            <span class="ns">every 7 AM PDT</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="legend" style="margin-top:4px;">
+        <span style="font-size:.58rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#b8ae9a;align-self:center;margin-right:4px;">Legend</span>
+        <div class="leg-item"><div class="leg-swatch" style="background:#fffbee;border-color:#d0a850;"></div><span class="leg-label">Claude Code</span></div>
+        <div class="leg-item"><div class="leg-swatch" style="background:#f0fff5;border-color:#80d090;"></div><span class="leg-label">GitHub (code + automation)</span></div>
+        <div class="leg-item"><div class="leg-swatch" style="background:#fff8ee;border-color:#e0b050;"></div><span class="leg-label">RSS data collection</span></div>
+        <div class="leg-item"><div class="leg-swatch" style="background:#f8f0ff;border-color:#b898e8;"></div><span class="leg-label">Gemini AI processing</span></div>
+        <div class="leg-item"><div class="leg-swatch" style="background:#f0f5ff;border-color:#88bce8;"></div><span class="leg-label">HTML email formatting</span></div>
+        <div class="leg-item"><div class="leg-swatch" style="background:#fff0f5;border-color:#f09ab0;"></div><span class="leg-label">Gmail delivery</span></div>
+        <div class="leg-item"><div class="leg-swatch" style="background:#f0fdf8;border-color:#78c8b8;"></div><span class="leg-label">Inbox</span></div>
+        <div class="leg-item" style="margin-left:4px;"><span class="nf" style="margin:0;">file.py</span>&nbsp;<span class="leg-label">= code file / library used</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- SLIDE 3 · TRIGGER + RSS FEEDS            -->
+<!-- ════════════════════════════════════════ -->
+<div class="slide" data-i="2">
+  <div class="w100">
+    <div class="ey">Components 1 & 2</div>
+    <div class="sh">Automation & Data Collection</div>
+    <div class="two-col">
+
+      <!-- LEFT: GitHub Actions -->
+      <div class="col">
+        <div class="col-card" style="border-color:#80d090;background:#f6fff8;">
+          <div class="ch">
+            <div class="ci" style="background:#d8f8e8;">⚙️</div>
+            <div>
+              <div class="csub" style="color:#1a6030;">GitHub Actions + Scheduler</div>
+              <h3>How it starts automatically every morning</h3>
+            </div>
+          </div>
+          <div style="margin-bottom:8px;"><span class="file-tag">📄 daily-digest.yml</span></div>
+          <div class="tps">
+            <div class="tp"><span class="ti">⏰</span><span class="tx"><strong>Cron schedule in code.</strong> <code>daily-digest.yml</code> defines <code>cron: "0 14 * * *"</code> — which means "run at 14:00 UTC every day" = 7 AM Pacific. GitHub reads this file and fires automatically.</span></div>
+            <div class="tp"><span class="ti">🖥️</span><span class="tx"><strong>Free cloud VM.</strong> GitHub spins up a Linux machine, runs <code>pip install -r requirements.txt</code>, injects your API keys from GitHub Secrets as environment variables, then executes <code>python digest.py</code>. Shuts down when done.</span></div>
+            <div class="tp"><span class="ti">🔑</span><span class="tx"><strong>Secrets stay secure.</strong> API keys and passwords live in GitHub Secrets (encrypted). They never appear in any code file — only injected at runtime.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: RSS Feeds -->
+      <div class="col">
+        <div class="col-card" style="border-color:#e0b050;background:#fffdf5;">
+          <div class="ch">
+            <div class="ci" style="background:#fff0d0;">📡</div>
+            <div>
+              <div class="csub" style="color:#8b5010;">RSS Feed Reader</div>
+              <h3>How the news gets collected</h3>
+            </div>
+          </div>
+          <div style="margin-bottom:8px;"><span class="file-tag">📄 digest.py → fetch_articles()</span><span class="file-tag" style="margin-left:6px;">📦 feedparser</span></div>
+          <div class="tps">
+            <div class="tp"><span class="ti">📰</span><span class="tx"><strong>What is RSS?</strong> Every major news site publishes a machine-readable list of their latest headlines called an RSS feed. The <code>feedparser</code> library visits all 15 feeds and grabs the 5 newest articles from each — no login, no scraping.</span></div>
+            <div class="tp"><span class="ti">📊</span><span class="tx"><strong>Output: ~75 articles</strong> across 5 categories — Finance, Geopolitics, Tech, Human Insights, and AI — all formatted and passed as one big prompt to Gemini.</span></div>
+          </div>
+          <!-- mini category row -->
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+            <span style="font-size:.64rem;font-weight:700;padding:3px 9px;border-radius:6px;background:#fff0d8;border:1px solid #e8b860;color:#7a4a00;">💰 Finance ×6</span>
+            <span style="font-size:.64rem;font-weight:700;padding:3px 9px;border-radius:6px;background:#fff8e8;border:1px solid #e0c050;color:#604000;">🌍 Geopolitics ×3</span>
+            <span style="font-size:.64rem;font-weight:700;padding:3px 9px;border-radius:6px;background:#f0f4ff;border:1px solid #9ab0f0;color:#203080;">⚡ Tech ×4</span>
+            <span style="font-size:.64rem;font-weight:700;padding:3px 9px;border-radius:6px;background:#fff5f0;border:1px solid #f0b080;color:#803020;">🧠 Human Insights ×4</span>
+            <span style="font-size:.64rem;font-weight:700;padding:3px 9px;border-radius:6px;background:#f0f8ff;border:1px solid #90c0f0;color:#204060;">🤖 AI ×4</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- SLIDE 4 · GEMINI + EMAIL DELIVERY        -->
+<!-- ════════════════════════════════════════ -->
+<div class="slide" data-i="3">
+  <div class="w100">
+    <div class="ey">Components 3, 4 & 5</div>
+    <div class="sh">AI Processing & Email Delivery</div>
+    <div class="two-col">
+
+      <!-- LEFT: Gemini -->
+      <div class="col">
+        <div class="col-card" style="border-color:#b898e8;background:#faf5ff;">
+          <div class="ch">
+            <div class="ci" style="background:#eddeff;">✦</div>
+            <div>
+              <div class="csub" style="color:#5020a0;">Gemini 2.5 Flash API</div>
+              <h3>The AI that reads & writes the digest</h3>
+            </div>
+          </div>
+          <div style="margin-bottom:8px;"><span class="file-tag">📄 digest.py → call_gemini()</span><span class="file-tag" style="margin-left:6px;">📦 google-genai</span></div>
+          <div class="tps">
+            <div class="tp"><span class="ti">✦</span><span class="tx"><strong>One API call, everything in.</strong> All ~75 headlines are bundled into one prompt. The prompt tells Gemini to act like a sharp, well-read friend — not a news robot. It reads everything and writes a 6-section digest with a <strong>bold headline per story</strong>.</span></div>
+            <div class="tp"><span class="ti">🔁</span><span class="tx"><strong>Auto-retry logic.</strong> If Gemini returns a 429 rate-limit error, <code>call_gemini()</code> waits 30 seconds and retries — up to 2 times before exiting cleanly.</span></div>
+            <div class="tp"><span class="ti">📋</span><span class="tx"><strong>6 output sections:</strong> 💰 Money Talk · 🌍 World Lore · ⚡ Tech Tea · 🧠 Human Insights · 🤖 AI · 🔥 Speed Round.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: HTML + Gmail -->
+      <div class="col" style="gap:10px;">
+        <div class="col-card" style="border-color:#88bce8;background:#f5f8ff;">
+          <div class="ch">
+            <div class="ci" style="background:#daeeff;">🎨</div>
+            <div>
+              <div class="csub" style="color:#204080;">HTML Email Builder</div>
+              <h3>Turns plain text into a polished email</h3>
+            </div>
+          </div>
+          <div style="margin-bottom:6px;"><span class="file-tag">📄 digest.py → build_html_email()</span></div>
+          <div class="tp"><span class="ti">🖥️</span><span class="tx">Parses Gemini's markdown, applies a dark background, color-coded section cards, bold headlines, and clean typography. Looks like a hand-designed newsletter — all in Python, no design tools.</span></div>
+        </div>
+        <div class="col-card" style="border-color:#f09ab0;background:#fff5f8;">
+          <div class="ch">
+            <div class="ci" style="background:#ffe0ec;">📬</div>
+            <div>
+              <div class="csub" style="color:#a02050;">Gmail SMTP</div>
+              <h3>Sends the email directly to your inbox</h3>
+            </div>
+          </div>
+          <div style="margin-bottom:6px;"><span class="file-tag">📄 digest.py → send_email()</span><span class="file-tag" style="margin-left:6px;">📦 smtplib</span></div>
+          <div class="tp"><span class="ti">🔐</span><span class="tx">Connects to Gmail's mail server over SSL (port 465) using a 16-character <strong>App Password</strong> — a separate credential stored in GitHub Secrets, not your real Gmail password. No third-party email service needed.</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- SLIDE 5 · CLAUDE CODE                    -->
+<!-- ════════════════════════════════════════ -->
+<div class="slide" data-i="4">
+  <div class="w100">
+    <div style="display:flex;align-items:flex-start;gap:24px;margin-bottom:14px;">
+      <div>
+        <div class="ey">The Builder</div>
+        <div class="sh" style="margin-bottom:0;">Claude Code — how this was built</div>
+      </div>
+      <div style="margin-left:auto;flex-shrink:0;background:#fffbee;border:1.5px solid #d0a850;border-radius:12px;padding:12px 18px;max-width:360px;">
+        <div style="font-size:.62rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#8b6030;margin-bottom:4px;">What is Claude Code?</div>
+        <div style="font-size:.79rem;color:var(--muted);line-height:1.6;">An AI coding assistant that lives in your terminal. You describe what you want in plain English — it writes, debugs, and maintains the code. It's not part of the running pipeline; it <em>built</em> the pipeline. Think of it as having a senior engineer on call at all times.</div>
+      </div>
+    </div>
+    <div class="cc-grid">
+      <div class="cc">
+        <span class="cci">📝</span>
+        <h4>Wrote all the code</h4>
+        <p>Every line of <code>digest.py</code> — RSS fetching, Gemini API call, HTML email builder, Gmail sender — from a plain English description.</p>
+      </div>
+      <div class="cc">
+        <span class="cci">⚙️</span>
+        <h4>Set up GitHub Actions</h4>
+        <p>Wrote <code>daily-digest.yml</code> — the workflow that schedules the job, installs Python, and injects secrets at runtime.</p>
+      </div>
+      <div class="cc">
+        <span class="cci">🔧</span>
+        <h4>Debugged every error</h4>
+        <p>Fixed deprecated APIs, wrong model names, Python not on PATH, wrong git file paths, and rate limit crashes — all in real time.</p>
+      </div>
+      <div class="cc">
+        <span class="cci">✏️</span>
+        <h4>Updated on request</h4>
+        <p>Swapped Gemini models, changed article counts, added/removed categories, tuned the AI prompt — all from one-line instructions.</p>
+      </div>
+      <div class="cc">
+        <span class="cci">🎨</span>
+        <h4>Built this presentation</h4>
+        <p>Designed and coded this entire slide deck — flowchart, deep dives, SVG illustrations — as a self-contained HTML file.</p>
+      </div>
+      <div class="cc">
+        <span class="cci">💬</span>
+        <h4>Explained everything</h4>
+        <p>Answered every question in plain English — "what is RSS?", "why did Gemini fail?", "how do I push to Git?" — throughout the build.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!-- SLIDE 6 · STATS                          -->
+<!-- ════════════════════════════════════════ -->
+<div class="slide" data-i="5">
+  <div class="w100" style="text-align:center;">
+    <div class="ey" style="text-align:center;">Summary</div>
+    <div class="sh" style="text-align:center;margin-bottom:18px;">What runs every morning at 7 AM</div>
+    <div class="stats4">
+      <div class="sc2"><div class="sn" style="color:#c87820;">15</div><div class="sl">News sources<br>across 5 categories</div></div>
+      <div class="sc2"><div class="sn" style="color:#3050c0;">~75</div><div class="sl">Articles collected<br>per run</div></div>
+      <div class="sc2"><div class="sn" style="color:#7030a0;">1</div><div class="sl">Gemini API call<br>writes the full digest</div></div>
+      <div class="sc2"><div class="sn" style="color:#a02050;">7 AM</div><div class="sl">In your inbox<br>every morning (PDT)</div></div>
+    </div>
+    <div class="brow">
+      <div class="bc"><div class="bl">Cost</div><div class="bv">~$0.001 per digest</div><div class="bs">Gemini 2.5 Flash · GitHub Actions free tier</div></div>
+      <div class="bc"><div class="bl">Stack</div><div class="bv">Python · GitHub · Gemini · Gmail</div><div class="bs">Built & maintained entirely with Claude Code</div></div>
+      <div class="bc"><div class="bl">Maintenance</div><div class="bv">Zero — fully automated</div><div class="bs">Runs itself every morning, no action needed</div></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<div class="nav">
+  <button class="nb" id="prev" onclick="go(-1)" disabled>←</button>
+  <div class="sc" id="ctr">1 / 6</div>
+  <button class="nb" id="next" onclick="go(1)">→</button>
+</div>
+<div class="dots" id="dots"></div>
+<div class="kh">← → arrow keys</div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const ctr=document.getElementById('ctr');
+  const dotsEl=document.getElementById('dots');
+  const prev=document.getElementById('prev');
+  const next=document.getElementById('next');
+  let cur=0;
+  slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot'+(i===0?' active':'');d.onclick=()=>goTo(i);dotsEl.appendChild(d);});
+  function goTo(n){if(n===cur)return;slides[cur].classList.remove('active');slides[cur].classList.add('out');setTimeout(()=>slides[cur].classList.remove('out'),350);cur=n;slides[cur].classList.add('active');dotsEl.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('active',i===cur));ctr.textContent=(cur+1)+' / '+slides.length;prev.disabled=cur===0;next.disabled=cur===slides.length-1;}
+  function go(d){const n=cur+d;if(n>=0&&n<slides.length)goTo(n);}
+  document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowDown')go(1);if(e.key==='ArrowLeft'||e.key==='ArrowUp')go(-1);});
+</script>
+</body>
+</html>
