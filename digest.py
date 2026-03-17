@@ -137,7 +137,7 @@ def call_gemini(prompt, retries=2, initial_wait=30):
             )
             return response.text
         except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "503" in str(e) or "UNAVAILABLE" in str(e):
                 if attempt < retries:
                     print(f"  Rate limited. Waiting {wait}s before retry {attempt}/{retries - 1}...")
                     time.sleep(wait)
