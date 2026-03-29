@@ -1,8 +1,9 @@
 import os
+import re
 import time
 import smtplib
 import feedparser
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
@@ -42,10 +43,10 @@ FEEDS = {
         ("Big Think", "https://bigthink.com/feed/"),
     ],
     "ai": [
-        ("MIT Tech Review AI", "https://www.technologyreview.com/feed/"),
+        ("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),
+        ("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index"),
+        ("Wired AI", "https://www.wired.com/feed/tag/ai/rss"),
         ("VentureBeat AI", "https://venturebeat.com/category/ai/feed/"),
-        ("Anthropic Blog", "https://www.anthropic.com/blog/rss"),
-        ("The Gradient", "https://thegradient.pub/rss/"),
     ],
 }
 
@@ -62,8 +63,6 @@ def fetch_articles():
                 for entry in feed.entries[:ARTICLES_PER_FEED]:
                     title = entry.get("title", "").strip()
                     summary = entry.get("summary", entry.get("description", "")).strip()
-                    # Strip HTML tags from summary crudely
-                    import re
                     summary = re.sub(r"<[^>]+>", "", summary)[:300]
                     if title:
                         articles.append(f"[{source}] {title}: {summary}")
@@ -71,7 +70,38 @@ def fetch_articles():
                 print(f"  Warning: Could not fetch {source} ({url}): {e}")
         all_articles[category] = articles
         print(f"  Fetched {len(articles)} articles for {category}")
+
+    # Anthropic Blog — only include if something was published in the last 24 hours
+    anthropic_articles = _fetch_anthropic_if_new()
+    if anthropic_articles:
+        all_articles["ai"].extend(anthropic_articles)
+        print(f"  Added {len(anthropic_articles)} new Anthropic Blog article(s)")
+    else:
+        print("  Anthropic Blog: no new posts today, skipping")
+
     return all_articles
+
+
+def _fetch_anthropic_if_new():
+    """Return Anthropic Blog articles published in the last 24 hours, or [] if none."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    articles = []
+    try:
+        feed = feedparser.parse("https://www.anthropic.com/blog/rss")
+        for entry in feed.entries[:ARTICLES_PER_FEED]:
+            published = entry.get("published_parsed") or entry.get("updated_parsed")
+            if published:
+                pub_dt = datetime(*published[:6], tzinfo=timezone.utc)
+                if pub_dt < cutoff:
+                    continue  # older than 24 hours — skip
+            title = entry.get("title", "").strip()
+            summary = entry.get("summary", entry.get("description", "")).strip()
+            summary = re.sub(r"<[^>]+>", "", summary)[:300]
+            if title:
+                articles.append(f"[Anthropic Blog] {title}: {summary}")
+    except Exception as e:
+        print(f"  Warning: Could not fetch Anthropic Blog: {e}")
+    return articles
 
 
 def build_prompt(articles):
@@ -151,8 +181,6 @@ def call_gemini(prompt, retries=2, initial_wait=30):
 
 def markdown_to_html_sections(text):
     """Convert the Gemini markdown output into styled HTML blocks."""
-    import re
-
     section_styles = {
         "Money Talk": {
             "color": "#00c896",
