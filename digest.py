@@ -53,10 +53,24 @@ FEEDS = {
 ARTICLES_PER_FEED = 5
 
 
+ARTICLE_MAX_AGE_HOURS = 36  # skip articles older than this
+
+
+def _entry_is_fresh(entry):
+    """Return True if the entry was published within ARTICLE_MAX_AGE_HOURS, or if no date is available."""
+    published = entry.get("published_parsed") or entry.get("updated_parsed")
+    if not published:
+        return True  # no date info — include it rather than silently drop
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=ARTICLE_MAX_AGE_HOURS)
+    pub_dt = datetime(*published[:6], tzinfo=timezone.utc)
+    return pub_dt >= cutoff
+
+
 def fetch_articles():
     all_articles = {}
     for category, feeds in FEEDS.items():
-        articles = []
+        fresh_articles = []
+        fallback_articles = []  # most-recent articles regardless of age
         for source, url in feeds:
             try:
                 feed = feedparser.parse(url)
@@ -64,10 +78,24 @@ def fetch_articles():
                     title = entry.get("title", "").strip()
                     summary = entry.get("summary", entry.get("description", "")).strip()
                     summary = re.sub(r"<[^>]+>", "", summary)[:300]
-                    if title:
-                        articles.append(f"[{source}] {title}: {summary}")
+                    if not title:
+                        continue
+                    item = f"[{source}] {title}: {summary}"
+                    if _entry_is_fresh(entry):
+                        fresh_articles.append(item)
+                    elif len(fallback_articles) < ARTICLES_PER_FEED:
+                        fallback_articles.append(item)
             except Exception as e:
                 print(f"  Warning: Could not fetch {source} ({url}): {e}")
+
+        # Use fresh articles; fall back to recent ones if the category would be too thin
+        if len(fresh_articles) >= 3:
+            articles = fresh_articles
+        else:
+            articles = fresh_articles + fallback_articles
+            if fallback_articles:
+                print(f"  {category}: only {len(fresh_articles)} fresh — added {len(fallback_articles)} fallback article(s)")
+
         all_articles[category] = articles
         print(f"  Fetched {len(articles)} articles for {category}")
 
@@ -142,7 +170,11 @@ Cover the most interesting ideas from psychology, behavior, and human potential.
 Cover the most important AI news and research. Start each story with a bold one-line headline, then explain what's happening and why it matters in simple terms — assume the reader is smart but not a technical expert. Cover 3–5 stories.
 
 ## Speed Round
-10 quick one-liner takeaways — one sentence each, covering anything from above that didn't make the main sections. Format as a numbered list.
+10 quick one-liner takeaways — one sentence each. Rules for this section:
+- Only include stories NOT already covered in the main sections above
+- Prioritize the most surprising, unusual, or underreported items
+- Skip anything that feels like a recurring theme or ongoing saga — today only
+- Format as a numbered list
 
 Rules:
 - Write like you're explaining to a smart friend, not writing a report
