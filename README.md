@@ -21,10 +21,6 @@ The result: a sharp 5-minute read covering Finance, Geopolitics, Tech, Human Ins
 
 ## Tech Stack
 
-![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
-![Google Gemini](https://img.shields.io/badge/Gemini_2.5_Flash-4285F4?style=flat&logo=google&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat&logo=githubactions&logoColor=white)
-
 | Layer | Technology |
 |---|---|
 | Language | Python |
