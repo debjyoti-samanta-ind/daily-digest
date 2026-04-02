@@ -48,6 +48,11 @@ FEEDS = {
         ("Wired AI", "https://www.wired.com/feed/tag/ai/rss"),
         ("VentureBeat AI", "https://venturebeat.com/category/ai/feed/"),
     ],
+    "india": [
+        ("The Hindu", "https://www.thehindu.com/feeder/default.rss"),
+        ("Business Standard", "https://www.business-standard.com/rss/home_page_top_stories.rss"),
+        ("Economic Times Tech", "https://economictimes.indiatimes.com/tech/rss.cms"),
+    ],
 }
 
 ARTICLES_PER_FEED = 5
@@ -136,6 +141,7 @@ def build_prompt(articles):
     sections = {
         "finance": "FINANCE",
         "geopolitics": "GEOPOLITICS",
+        "india": "INDIA",
         "tech": "TECH",
         "human_insights": "HUMAN INSIGHTS",
         "ai": "AI",
@@ -149,7 +155,7 @@ def build_prompt(articles):
 
     prompt = f"""You are a sharp, witty friend who actually reads the news. Your job is to write a daily digest that is clear, easy to understand, and fun to read — like explaining the news to a smart friend over coffee.
 
-Here are today's articles across five categories:
+Here are today's articles across six categories:
 {article_dump}
 
 Write a digest with exactly these six sections. Use the section headers exactly as shown:
@@ -160,6 +166,9 @@ Cover the most interesting finance and market news. Start each story with a bold
 ## World Lore
 Cover the key geopolitics stories. Start each story with a bold one-line headline, then explain what happened, why it matters, and what most people are missing. Cover 3–5 stories.
 
+## Back Home
+Cover the most interesting stories from India — politics, economy, business, tech, or anything else worth knowing. Start each story with a bold one-line headline, then explain it simply. Cover 3–5 stories.
+
 ## Tech Tea
 Cover what's happening in tech. Start each story with a bold one-line headline, then break it down simply — what it is, why it matters. Cover 3–5 stories.
 
@@ -168,13 +177,6 @@ Cover the most interesting ideas from psychology, behavior, and human potential.
 
 ## AI
 Cover the most important AI news and research. Start each story with a bold one-line headline, then explain what's happening and why it matters in simple terms — assume the reader is smart but not a technical expert. Cover 3–5 stories.
-
-## Speed Round
-10 quick one-liner takeaways — one sentence each. Rules for this section:
-- Only include stories NOT already covered in the main sections above
-- Prioritize the most surprising, unusual, or underreported items
-- Skip anything that feels like a recurring theme or ongoing saga — today only
-- Format as a numbered list
 
 Rules:
 - Write like you're explaining to a smart friend, not writing a report
@@ -239,15 +241,15 @@ def markdown_to_html_sections(text):
             "icon": "🤖",
             "bg": "#0a1f2e",
         },
-        "Speed Round": {
-            "color": "#ff6b6b",
-            "icon": "🔥",
-            "bg": "#3a1010",
+        "Back Home": {
+            "color": "#ff9933",
+            "icon": "🇮🇳",
+            "bg": "#2e1a00",
         },
     }
 
     # Split by section headers (## Section Name)
-    pattern = r"##\s+(Money Talk|World Lore|Tech Tea|Human Insights|AI|Speed Round)"
+    pattern = r"##\s+(Money Talk|World Lore|Back Home|Tech Tea|Human Insights|AI)"
     parts = re.split(pattern, text)
 
     html_sections = ""

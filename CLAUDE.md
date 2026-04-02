@@ -34,11 +34,12 @@ The cron-job.org request:
 | Tech | Hacker News, TechCrunch, The Verge, Wired |
 | Human Insights | HBR, Psychology Today, The Cut, Big Think |
 | AI | TechCrunch AI, Ars Technica, Wired AI, VentureBeat AI, Anthropic Blog (only if new post in last 24 hours) |
+| India | The Hindu, Business Standard, Economic Times Tech |
 
 5 articles fetched per feed (`ARTICLES_PER_FEED = 5`).
 
 ## Email sections
-💰 Money Talk · 🌍 World Lore · ⚡ Tech Tea · 🧠 Human Insights · 🤖 AI · 🔥 Speed Round
+💰 Money Talk · 🌍 World Lore · 🇮🇳 Back Home · ⚡ Tech Tea · 🧠 Human Insights · 🤖 AI
 
 ## Key decisions
 - **Gemini 2.5 Flash** — fast and cheap (~$0.001/run)
