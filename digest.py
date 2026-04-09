@@ -190,27 +190,45 @@ Rules:
     return prompt
 
 
-def call_gemini(prompt, retries=2, initial_wait=30):
+def call_gemini(prompt, retries=3, initial_wait=30):
     client = genai.Client(api_key=GEMINI_API_KEY)
-    wait = initial_wait
-    for attempt in range(1, retries + 1):
-        try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-            )
-            return response.text
-        except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "503" in str(e) or "UNAVAILABLE" in str(e):
-                if attempt < retries:
-                    print(f"  Rate limited. Waiting {wait}s before retry {attempt}/{retries - 1}...")
-                    time.sleep(wait)
-                    wait *= 2  # exponential backoff: 30s → 60s → 120s → 240s
+    primary_model = "gemini-2.5-flash"
+    fallback_model = "gemini-2.0-flash"
+
+    for model in [primary_model, fallback_model]:
+        wait = initial_wait
+        for attempt in range(1, retries + 1):
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                )
+                if model != primary_model:
+                    print(f"  (Used fallback model: {model})")
+                return response.text
+            except Exception as e:
+                is_quota = "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)
+                is_unavailable = "503" in str(e) or "UNAVAILABLE" in str(e)
+                if is_unavailable:
+                    if attempt < retries:
+                        print(f"  Model unavailable ({model}). Waiting {wait}s before retry {attempt}/{retries - 1}...")
+                        time.sleep(wait)
+                        wait *= 2  # exponential backoff: 30s → 60s → 120s
+                    else:
+                        print(f"  {model} unavailable after all retries.{' Trying fallback model...' if model == primary_model else ''}")
+                        break  # move to fallback model
+                elif is_quota:
+                    if attempt < retries:
+                        print(f"  Rate limited. Waiting {wait}s before retry {attempt}/{retries - 1}...")
+                        time.sleep(wait)
+                        wait *= 2
+                    else:
+                        print("  Gemini quota exhausted after all retries. Try again after midnight PT.")
+                        raise
                 else:
-                    print("  Gemini quota exhausted after all retries. Try again after midnight PT.")
                     raise
-            else:
-                raise
+
+    raise RuntimeError("All Gemini models failed. Check API status or quota.")
 
 
 def markdown_to_html_sections(text):
