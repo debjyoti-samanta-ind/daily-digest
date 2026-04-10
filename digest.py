@@ -193,7 +193,7 @@ Rules:
 def call_gemini(prompt, retries=3, initial_wait=30):
     client = genai.Client(api_key=GEMINI_API_KEY)
     primary_model = "gemini-2.5-flash"
-    fallback_model = "gemini-2.0-flash"
+    fallback_model = "gemini-2.5-flash-lite"
 
     for model in [primary_model, fallback_model]:
         wait = initial_wait

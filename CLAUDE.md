@@ -42,7 +42,7 @@ The cron-job.org request:
 💰 Money Talk · 🌍 World Lore · 🇮🇳 Back Home · ⚡ Tech Tea · 🧠 Human Insights · 🤖 AI
 
 ## Key decisions
-- **Gemini 2.5 Flash** — fast and cheap (~$0.001/run)
+- **Gemini 2.5 Flash** — fast and cheap (~$0.001/run); falls back to **Gemini 2.5 Flash Lite** on 503 errors
 - **workflow_dispatch only** — GitHub's cron skipped a run on Mar 16 2026 despite correct config; moved to cron-job.org as the sole scheduler
 - **Numbered list prefixes stripped in HTML formatter** — Gemini wraps stories in numbered lists; stripping the `1.` prefix prevents each story headline from showing "1." in the rendered email
 
