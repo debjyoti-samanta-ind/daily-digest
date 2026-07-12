@@ -186,6 +186,7 @@ Rules:
 - Keep it interesting — if something is dry, find the angle that makes it matter
 - If something is surprising or important, say so clearly
 - Keep total length under 1500 words
+- If a story is relevant to multiple sections (e.g. an AI story that's also tech, or a market-moving tech story), cover it only once, in the single most relevant section. Don't repeat the same story elsewhere.
 """
     return prompt
 
