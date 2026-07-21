@@ -3,6 +3,9 @@ name: Daily Digest
 on:
   workflow_dispatch: # triggered externally via cron-job.org
 
+permissions:
+  contents: write # needed for the "Commit dashboard digest" step below to push
+
 jobs:
   send-digest:
     runs-on: ubuntu-latest
@@ -27,3 +30,15 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
         run: python digest.py
+
+      - name: Commit dashboard digest
+        # Best-effort only — the email above has already sent by this point
+        # regardless of what happens here. A failed push (rare — e.g. a
+        # token hiccup) shows as a soft warning, not a failed run.
+        continue-on-error: true
+        run: |
+          git config user.name "daily-digest-bot"
+          git config user.email "actions@github.com"
+          git add data/latest.json
+          git diff --cached --quiet && echo "No digest changes to commit" || git commit -m "Update dashboard digest"
+          git push

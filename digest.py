@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import json
 import smtplib
 import feedparser
 from datetime import datetime, timezone, timedelta
@@ -317,6 +318,54 @@ def markdown_to_html_sections(text):
     return html_sections
 
 
+def markdown_to_json(text, generated_at_iso):
+    """Best-effort structured extraction from the same digest_text used for
+    the email, for the Dashboard Hub's news panel. Deliberately does NOT call
+    Gemini again or touch the email path at all — this parses the markdown
+    that's *already* been generated and emailed successfully by the time
+    this runs. No source/link fields: the model's output doesn't carry
+    article URLs, so these are headline+summary only. A section producing
+    zero stories (unexpected formatting) is just omitted, not an error."""
+    pattern = r"##\s+(Money Talk|World Lore|Back Home|Tech Tea|Human Insights|AI)"
+    parts = re.split(pattern, text)
+
+    sections = []
+    for i in range(1, len(parts), 2):
+        category = parts[i].strip()
+        body = parts[i + 1].strip() if i + 1 < len(parts) else ""
+        body = re.sub(r"^\d+\.\s+", "", body, flags=re.MULTILINE)  # same numbered-prefix strip as the email renderer
+
+        stories = []
+        paragraphs = re.split(r"\n{2,}", body)
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+            match = re.match(r"^\*\*(.+?)\*\*[:\s]*(.*)", para, flags=re.DOTALL)
+            if not match:
+                continue  # intro/stray text with no bold headline — not a story, skip
+            headline = match.group(1).strip().rstrip(":").strip()
+            summary = match.group(2).strip()
+            summary = re.sub(r"\*\*(.+?)\*\*", r"\1", summary)  # drop any inline bold in the summary
+            summary = summary.replace("\n", " ").strip()
+            if headline:
+                stories.append({"headline": headline, "summary": summary})
+
+        if stories:
+            sections.append({"category": category, "stories": stories})
+
+    return {"generated_at": generated_at_iso, "sections": sections}
+
+
+def write_digest_json(digest_json, path="data/latest.json"):
+    dir_name = os.path.dirname(path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(digest_json, f, ensure_ascii=False, indent=2)
+    print(f"  Wrote {path}")
+
+
 def build_html_email(digest_text):
     today = datetime.now().strftime("%A, %B %-d, %Y")
     sections_html = markdown_to_html_sections(digest_text)
@@ -404,6 +453,17 @@ def main():
     print("[4/4] Building HTML and sending email...")
     html = build_html_email(digest_text)
     send_email(html)
+
+    # Dashboard export — runs only after the email above has already sent
+    # successfully, and any failure here is caught and logged, never raised,
+    # so it can't affect the exit code or the email that already went out.
+    try:
+        print("\n[Dashboard] Writing structured digest JSON...")
+        generated_at = datetime.now(timezone.utc).isoformat()
+        digest_json = markdown_to_json(digest_text, generated_at)
+        write_digest_json(digest_json)
+    except Exception as e:
+        print(f"  Warning: could not write dashboard JSON ({e}) — email above was unaffected.")
 
     print("\nDone.")
 
