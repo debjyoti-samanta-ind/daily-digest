@@ -334,16 +334,13 @@ def markdown_to_json(text, generated_at_iso):
         category = parts[i].strip()
         body = parts[i + 1].strip() if i + 1 < len(parts) else ""
         body = re.sub(r"^\d+\.\s+", "", body, flags=re.MULTILINE)  # same numbered-prefix strip as the email renderer
+        body = re.sub(r"^[-*]\s+", "", body, flags=re.MULTILINE)  # same bullet-marker strip as the email renderer
 
+        # Anchor on each bold headline rather than blank-line paragraphs — Gemini
+        # sometimes writes stories as a tight bullet list with no blank line
+        # between items, which would otherwise merge them into one story.
         stories = []
-        paragraphs = re.split(r"\n{2,}", body)
-        for para in paragraphs:
-            para = para.strip()
-            if not para:
-                continue
-            match = re.match(r"^\*\*(.+?)\*\*[:\s]*(.*)", para, flags=re.DOTALL)
-            if not match:
-                continue  # intro/stray text with no bold headline — not a story, skip
+        for match in re.finditer(r"^\*\*(.+?)\*\*[:\s]*(.*?)(?=\n\*\*|\Z)", body, flags=re.MULTILINE | re.DOTALL):
             headline = match.group(1).strip().rstrip(":").strip()
             summary = match.group(2).strip()
             summary = re.sub(r"\*\*(.+?)\*\*", r"\1", summary)  # drop any inline bold in the summary
